@@ -75,6 +75,8 @@ class Biblioteca:
 
     def crear_socio(self, codigo: str, nombre: str, tipo="estudiante",
                     email=None, telefono=None) -> int:
+        if not codigo.strip() or not nombre.strip():
+            raise BibliotecaError("código y nombre son obligatorios")
         if tipo not in ("estudiante", "docente", "administrativo", "externo"):
             raise BibliotecaError(f"tipo inválido: {tipo}")
         try:
@@ -94,6 +96,17 @@ class Biblioteca:
             raise BibliotecaError(f"el socio tiene {activos} préstamo(s) activo(s)")
         self.con.execute("UPDATE socios SET activo = 0 WHERE id = ?", (socio_id,))
         self.con.commit()
+
+    def listar_socios(self, solo_activos=True):
+        """Socios con su número de préstamos en curso (activos o vencidos sin devolver)."""
+        sql = """SELECT s.id, s.codigo, s.nombre, s.tipo, s.email, s.activo,
+                        (SELECT COUNT(*) FROM prestamos p
+                          WHERE p.socio_id = s.id AND p.estado IN ('activo','vencido'))
+                        AS prestamos_en_curso
+                 FROM socios s"""
+        if solo_activos:
+            sql += " WHERE s.activo = 1"
+        return self._todos(sql + " ORDER BY s.id")
 
     # ---------- catálogo ----------
 
@@ -171,7 +184,7 @@ class Biblioteca:
         p = self._uno("SELECT * FROM prestamos WHERE id = ?", (prestamo_id,))
         if not p:
             raise BibliotecaError(f"préstamo {prestamo_id} no existe")
-        if p["estado"] != "activo":
+        if p["estado"] not in ("activo", "vencido"):
             raise BibliotecaError(f"el préstamo ya está en estado '{p['estado']}'")
 
         self.con.execute(

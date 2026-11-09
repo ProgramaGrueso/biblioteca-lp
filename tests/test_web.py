@@ -15,9 +15,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from app.core import Biblioteca  # noqa: E402
 from app.web import crear_servidor  # noqa: E402
+from test_core import base_limpia  # noqa: E402
 
 DB_FUENTE = ROOT / "data" / "biblioteca.db"
 
@@ -31,6 +33,7 @@ class TestWebBase(unittest.TestCase):
         
         # Crear socio de prueba en la copia de prueba
         with Biblioteca(cls.db) as bib:
+            base_limpia(bib)
             cls.socio_id = bib.crear_socio("W-001", "Carlos Web", "estudiante")
             cls.socio2_id = bib.crear_socio("W-002", "Elena Web", "estudiante")
             # Libro con un solo ejemplar para probar préstamo y reserva
@@ -139,6 +142,30 @@ class TestWebEndpoints(TestWebBase):
         self.assertEqual(code, 400)
         self.assertFalse(resp.get("ok"))
         self.assertIn("error", resp)
+
+    def test_05b_reportes_sin_llaves_sueltas(self):
+        code, html = self._get("/reportes")
+        self.assertEqual(code, 200)
+        self.assertIn("Préstamos Vencidos (", html)
+        self.assertNotIn("{len(", html)
+
+    def test_06_pagina_socios(self):
+        code, html = self._get("/socios")
+        self.assertEqual(code, 200)
+        self.assertIn("Nuevo Socio", html)
+        self.assertIn("Carlos Web", html)
+
+    def test_07_registrar_socio_formulario(self):
+        code, html = self._post_form("/socios", {"codigo": "W-100", "nombre": "Marta Form",
+                                                 "tipo": "docente"})
+        self.assertEqual(code, 200)  # sigue el 303 hacia /socios
+        self.assertIn("Marta Form", html)
+        self.assertIn("registrado", html)
+
+    def test_08_socio_duplicado_muestra_error(self):
+        code, html = self._post_form("/socios", {"codigo": "W-001", "nombre": "Repetido"})
+        self.assertEqual(code, 200)
+        self.assertIn("ya existe", html)
 
 
 if __name__ == '__main__':

@@ -8,3 +8,4 @@ __pycache__/
 # Base de trabajo: binaria y guardará datos de socios (nombre, correo, teléfono).
 data/*.db
 data/*.db-*
+data/*.bak-*

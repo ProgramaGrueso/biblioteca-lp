@@ -14,6 +14,16 @@ sys.path.insert(0, str(ROOT))
 
 from app.core import Biblioteca, BibliotecaError, MAX_PRESTAMOS_ACTIVOS  # noqa: E402
 
+
+def base_limpia(bib):
+    """Deja la copia solo con catálogo: sin socios ni movimientos (la base real puede
+    tener datos de demostración)."""
+    bib.con.executescript("""
+        DELETE FROM reservas; DELETE FROM prestamos; DELETE FROM socios;
+        UPDATE ejemplares SET estado = 'disponible';
+    """)
+    bib.con.commit()
+
 DB_FUENTE = ROOT / "data" / "biblioteca.db"
 
 
@@ -23,6 +33,7 @@ class Base(unittest.TestCase):
         self.db = Path(self.tmp) / "test.db"
         shutil.copy(DB_FUENTE, self.db)
         self.bib = Biblioteca(self.db)
+        base_limpia(self.bib)
         self.socio = self.bib.crear_socio("S-001", "Ana Torres")
         # libro con un solo ejemplar, para forzar escenarios
         row = self.bib._uno(
@@ -79,6 +90,18 @@ class TestPrestamos(Base):
 
 
 class TestDevoluciones(Base):
+    def test_devuelve_prestamo_vencido(self):
+        hace_30 = date.today() - timedelta(days=30)
+        p = self.bib.prestar(self.socio, self.libro_unico, hoy=hace_30)
+        self.assertEqual(self.bib.vencer_prestamos(), 1)
+        res = self.bib.devolver(p.id)
+        self.assertTrue(res["atrasado"])
+        self.assertEqual(res["estado_ejemplar"], "disponible")
+
+    def test_socio_sin_codigo_falla(self):
+        with self.assertRaises(BibliotecaError):
+            self.bib.crear_socio("  ", "Sin Código")
+
     def test_devolucion_libera_ejemplar(self):
         p = self.bib.prestar(self.socio, self.libro_unico)
         r = self.bib.devolver(p.id)

@@ -4,8 +4,18 @@ Trabajo grupal del curso **Lenguaje de Programación**. El objetivo es un sistem
 de biblioteca (préstamos, devoluciones, reservas y estados de ejemplar), en la misma línea
 del sistema de citas quirúrgicas que ya trabajamos con el mismo profesor.
 
-Estado actual: **la data**. Todavía no hay app: el catálogo real ya está scrapeado y la base
-con el esquema del sistema está armada, lista para montar encima la lógica.
+Estado actual: catálogo real scrapeado, núcleo con las reglas de negocio, consola,
+interfaz web y 25 pruebas automáticas. Todo en Python con la librería estándar.
+
+**¿Cómo lo ejecuto?** Sigue [GUIA.md](GUIA.md) (requisitos, instalación y demo paso a paso).
+
+Arranque rápido:
+
+```bash
+python3 scripts/crear_base.py     # crea data/biblioteca.db desde libros.json
+python3 scripts/datos_demo.py     # socios y préstamos de prueba
+python3 -m app.web --port 8080    # http://127.0.0.1:8080
+```
 
 ## Estructura
 
@@ -83,3 +93,17 @@ Reglas ya cubiertas por las pruebas: no prestar sin ejemplar disponible, no repe
 con el mismo socio, máximo 3 préstamos activos, devolución que libera o reserva el ejemplar,
 atención automática de la reserva pendiente, detección de atrasos y vencimiento masivo.
 
+
+## Datos de demostración y socios
+
+- `scripts/datos_demo.py` carga 10 socios (DEMO-01 … DEMO-10), 14 préstamos ya devueltos,
+  5 activos, 2 vencidos y una reserva pendiente de *Pedro Páramo*. Respalda la base antes
+  y no repite la carga si ya existen socios DEMO-*.
+
+```bash
+python3 scripts/datos_demo.py
+python3 -m app.web --port 8080      # http://127.0.0.1:8080
+```
+
+- La web tiene página **Socios** (`/socios`): alta con validación y lista con préstamos en curso.
+- Un préstamo `vencido` también se puede devolver (queda marcado como atrasado).

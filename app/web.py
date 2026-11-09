@@ -59,6 +59,7 @@ class BibliotecaWebHandler(BaseHTTPRequestHandler):
         <h1>📚 Sistema de Biblioteca</h1>
         <nav>
             <a href=\"/\">Buscar Catálogo</a>
+            <a href=\"/socios\">Socios</a>
             <a href=\"/devolver\">Devoluciones</a>
             <a href=\"/reportes\">Reportes</a>
         </nav>
@@ -270,7 +271,7 @@ class BibliotecaWebHandler(BaseHTTPRequestHandler):
                 """
                 for m in mas:
                     cuerpo += f"<tr><td>{html.escape(m['titulo'])}</td><td>{html.escape(m['autores'] or '-')}</td><td>{m['veces']}</td></tr>"
-                cuerpo += """
+                cuerpo += f"""
                         </tbody>
                     </table>
                 </div>
@@ -282,6 +283,40 @@ class BibliotecaWebHandler(BaseHTTPRequestHandler):
                 """
                 for v in venc:
                     cuerpo += f"<tr><td>{v['id']}</td><td>{html.escape(v['socio'])}</td><td>{html.escape(v['titulo'])}</td><td>{v['dias_atraso']}</td></tr>"
+                cuerpo += "</tbody></table></div>"
+                self._responder_html(200, cuerpo)
+            elif u.path == "/socios":
+                msg = params.get("msg", [""])[0]
+                err = params.get("err", [""])[0]
+                socios = bib.listar_socios()
+                cuerpo = ""
+                if msg:
+                    cuerpo += f"<div class=\"exito\">{html.escape(msg)}</div>"
+                if err:
+                    cuerpo += f"<div class=\"error\">{html.escape(err)}</div>"
+                tipos = "".join(f"<option value=\"{t}\">{t.capitalize()}</option>"
+                                for t in ("estudiante", "docente", "administrativo", "externo"))
+                cuerpo += f"""
+                <div class=\"card\">
+                    <h2>Nuevo Socio</h2>
+                    <form method=\"POST\" action=\"/socios\">
+                        <label>Código:<br><input type=\"text\" name=\"codigo\" required placeholder=\"Ej. U-2026-001\"></label><br><br>
+                        <label>Nombre:<br><input type=\"text\" name=\"nombre\" required style=\"width: 100%;\"></label><br><br>
+                        <label>Tipo:<br><select name=\"tipo\">{tipos}</select></label><br><br>
+                        <label>Email (opcional):<br><input type=\"email\" name=\"email\"></label><br><br>
+                        <button type=\"submit\">Registrar Socio</button>
+                    </form>
+                </div>
+                <div class=\"card\">
+                    <h2>Socios Activos ({len(socios)})</h2>
+                    <table>
+                        <thead><tr><th>ID</th><th>Código</th><th>Nombre</th><th>Tipo</th><th>Préstamos en curso</th></tr></thead>
+                        <tbody>
+                """
+                for s in socios:
+                    cuerpo += (f"<tr><td>{s['id']}</td><td>{html.escape(s['codigo'])}</td>"
+                               f"<td>{html.escape(s['nombre'])}</td><td>{s['tipo']}</td>"
+                               f"<td>{s['prestamos_en_curso']}</td></tr>")
                 cuerpo += "</tbody></table></div>"
                 self._responder_html(200, cuerpo)
             else:
@@ -339,6 +374,18 @@ class BibliotecaWebHandler(BaseHTTPRequestHandler):
                         self.send_response(303)
                         self.send_header("Location", f"/libro?id={libro_id}&msg={parse_qs_quote(msg)}")
                         self.end_headers()
+                elif u.path in ("/socios", "/api/socios"):
+                    sid = bib.crear_socio(
+                        str(data.get("codigo", "")), str(data.get("nombre", "")),
+                        tipo=data.get("tipo") or "estudiante",
+                        email=data.get("email") or None)
+                    if is_json or u.path.startswith("/api/"):
+                        self._responder_json(200, {"ok": True, "socio_id": sid})
+                    else:
+                        msg = f"Socio #{sid} registrado: {data.get('nombre')}"
+                        self.send_response(303)
+                        self.send_header("Location", f"/socios?msg={parse_qs_quote(msg)}")
+                        self.end_headers()
                 else:
                     if is_json or u.path.startswith("/api/"):
                         self._responder_json(404, {"ok": False, "error": "ruta no encontrada"})
@@ -357,6 +404,10 @@ class BibliotecaWebHandler(BaseHTTPRequestHandler):
                     elif u.path == "/devolver":
                         self.send_response(303)
                         self.send_header("Location", f"/devolver?err={parse_qs_quote(str(exc))}")
+                        self.end_headers()
+                    elif u.path == "/socios":
+                        self.send_response(303)
+                        self.send_header("Location", f"/socios?err={parse_qs_quote(str(exc))}")
                         self.end_headers()
                     else:
                         self._responder_html(400, f"<div class=\"error\">{html.escape(str(exc))}</div>")
